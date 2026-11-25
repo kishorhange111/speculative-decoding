@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "speculative-decoding"
+version = "0.1.0"
+description = "Speculative decoding from scratch on GPT-2 (draft gpt2, target gpt2-xl): the exact accept-reject rule, KV-cache rollback, prompt-lookup decoding, acceptance and wall-clock speed-up on a T4."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Kishor Hange" }]
+dependencies = ["torch>=2.2", "numpy>=1.26", "transformers>=4.40"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E741", "E731"]
