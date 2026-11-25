@@ -58,4 +58,41 @@ pytest -q                                          # 10 tests, CPU
 python -m specdec.bench --out results              # GPU, resumable (runs.jsonl)
 ```
 
-**Results are pending** from the Colab run.
+## Results (Tesla T4, Colab)
+
+The target is gpt2-xl in fp16, decoding 10 prompts × 128 new tokens per domain. The full
+tables (28 configurations) are in [`results/summary.md`](results/summary.md) and the raw
+rows in [`results/runs.jsonl`](results/runs.jsonl). Plain greedy decoding of the target runs
+at 37.5 tokens/s on code and 36.8 on prose.
+
+| domain | method | γ | speed-up | acceptance | tokens / target call |
+|---|---|---|---|---|---|
+| code | draft gpt2 | 4 | 1.73× | 68% | 3.71 |
+| code | draft gpt2-medium | 2 | 1.29× | 86% | 2.71 |
+| code | prompt lookup | 8 | **1.95×** | 36% | 2.21 |
+| prose | draft gpt2 | 4 | 1.52× | 59% | 3.33 |
+| prose | draft gpt2-medium | 8 | 0.92× | 49% | 4.87 |
+| prose | prompt lookup | 8 | **2.12×** | 26% | 2.29 |
+| code, T = 1 | draft gpt2 | 4 | 1.11× | 37% | 2.45 |
+| prose, T = 1 | prompt lookup | 4 | 1.01× | 3% | 1.04 |
+
+What the numbers show:
+- **Prompt lookup was the fastest method in both domains**, at 1.95× and 2.12×. It commits
+  only 2.2–2.3 tokens per target call, against 3.3–3.7 for the gpt2 draft. But its drafts
+  cost nothing, while the gpt2 draft runs γ forward passes before every verification.
+- **More acceptance is not more speed.** gpt2-medium is accepted more often than gpt2
+  (86% vs 78% on code at γ=2), but it is always slower, because a 355M draft is a large
+  fraction of the 1.5B target's cost. At γ=8 on prose it is slower than not speculating
+  (0.92×).
+- **For a model draft, γ=4 is the sweet spot.** Acceptance falls steadily with γ (gpt2 on
+  code: 78% → 68% → 58% → 50%), so past γ=4 the extra draft passes cost more than the extra
+  accepted tokens save.
+- **Sampling at T = 1 erases most of the gain** (1.01–1.17×). The target's distribution is
+  flatter, so the `min(1, q/p)` test rejects more often. Lookup's one-hot proposals are
+  almost never accepted on prose (3%).
+- **Greedy outputs: 100% identical on code, 80% on prose with a model draft.** Every
+  draft-model config on prose has 8 of 10 sequences identical to plain greedy decoding,
+  while prompt lookup has 10 of 10. The fp64 CPU tests show that the algorithm reproduces greedy
+  decoding exactly. The likely cause is fp16: scoring γ + 1 tokens in one forward rounds
+  differently from scoring one, so a near-tie can flip and the sequence then diverges.
+  This run did not record which tokens flipped.
